@@ -8,6 +8,7 @@ Routes image processing tasks to the appropriate service:
 """
 
 import os
+import base64
 import logging
 from celery import Celery
 
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 celery_app = Celery("worker", broker=redis_url, backend=redis_url)
 
-# Celery config — store results as bytes safely
+# Use JSON serializer — safe for root containers, no pickle security warnings
 celery_app.conf.update(
-    result_serializer="pickle",
-    accept_content=["pickle", "json"],
-    task_serializer="pickle",
+    result_serializer="json",
+    accept_content=["json"],
+    task_serializer="json",
 )
 
 
@@ -47,37 +48,40 @@ def process_image_task(self, image_bytes: bytes, action: str, params: dict = Non
     try:
         # ── Classic operations (fast, no GPU needed) ──────────────────────────
         if action == "grayscale":
-            return processor.to_grayscale(image_bytes)
+            result = processor.to_grayscale(image_bytes)
+            return base64.b64encode(result).decode("utf-8")
 
         elif action == "blur":
             level = int(params.get("level", 5))
-            return processor.apply_blur(image_bytes, level)
+            result = processor.apply_blur(image_bytes, level)
+            return base64.b64encode(result).decode("utf-8")
 
         elif action == "adjust":
-            return processor.adjust_image(
+            result = processor.adjust_image(
                 image_bytes,
                 brightness = float(params.get("brightness", 1.0)),
                 contrast   = float(params.get("contrast",   1.0)),
                 saturation = float(params.get("saturation", 1.0)),
             )
+            return base64.b64encode(result).decode("utf-8")
 
         # ── AI operations (may use GPU, first call downloads weights) ─────────
         elif action == "colorize":
             logger.info("[Worker] Starting colorization task …")
             result = colorize_image(image_bytes)
             logger.info("[Worker] Colorization complete.")
-            return result
+            return base64.b64encode(result).decode("utf-8")
 
         elif action == "sharpen":
             outscale = float(params.get("outscale", 1.0))
             logger.info(f"[Worker] Starting sharpening task (outscale={outscale}) …")
             result = sharpen_image(image_bytes, outscale=outscale)
             logger.info("[Worker] Sharpening complete.")
-            return result
+            return base64.b64encode(result).decode("utf-8")
 
         else:
             logger.warning(f"[Worker] Unknown action '{action}', returning original.")
-            return image_bytes
+            return base64.b64encode(image_bytes).decode("utf-8")
 
     except Exception as exc:
         logger.error(f"[Worker] Task failed for action='{action}': {exc}")

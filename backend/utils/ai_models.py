@@ -14,9 +14,8 @@ import numpy as np
 from PIL import Image
 import io
 import os
-import urllib.request
 import logging
-
+import requests
 import torch
 
 logger = logging.getLogger(__name__)
@@ -31,85 +30,103 @@ def _download(url: str, dest: str) -> None:
     if os.path.exists(dest):
         return
     logger.info(f"[Model] Downloading {os.path.basename(dest)} …")
-    urllib.request.urlretrieve(url, dest)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/124.0.0.0 Safari/537.36"
+    }
+    with requests.get(url, headers=headers, stream=True, timeout=120) as r:
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in r.iter_content(chunk_size=65536):
+                f.write(chunk)
     logger.info(f"[Model] {os.path.basename(dest)} ready.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 1. COLORIZATION  (Zhang et al. 2016 — opencv dnn + caffe)
+# 1. COLORIZATION  (richzhang/colorization via PyTorch Hub)
 # ══════════════════════════════════════════════════════════════════════════════
+#
+# PyTorch Hub downloads weights (~55 MB) to ~/.cache/torch/hub/checkpoints/
+# on first call — no external URL configuration needed.
 
-_COLORIZE_PROTO_URL = (
-    "https://raw.githubusercontent.com/richzhang/colorization/"
-    "caffe/colorization/models/colorization_deploy_v2.prototxt"
-)
-_COLORIZE_MODEL_URL = (
-    "http://eecs.berkeley.edu/~rich.zhang/projects/2016_colorization/"
-    "files/demo_v2/colorization_release_v2.caffemodel"
-)
-_COLORIZE_HULL_URL = (
-    "https://github.com/richzhang/colorization/raw/caffe/"
-    "colorization/resources/pts_in_hull.npy"
-)
+_colorizer = None  # cached after first load
 
-_colorize_net = None  # cached after first load
+# Path where torch.hub extracted the richzhang/colorization repo
+_HUB_REPO_PATH = "/root/.cache/torch/hub/richzhang_colorization_master"
 
 
-def _load_colorize_net():
-    global _colorize_net
-    if _colorize_net is not None:
-        return _colorize_net
+def _ensure_colorizer_downloaded():
+    """Download the colorization repo if not already cached."""
+    if not os.path.exists(_HUB_REPO_PATH):
+        logger.info("[Colorizer] Downloading richzhang/colorization repo …")
+        import zipfile
+        zip_path = "/root/.cache/torch/hub/master.zip"
+        os.makedirs("/root/.cache/torch/hub", exist_ok=True)
+        _download(
+            "https://github.com/richzhang/colorization/archive/refs/heads/master.zip",
+            zip_path,
+        )
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall("/root/.cache/torch/hub/")
+        extracted = "/root/.cache/torch/hub/colorization-master"
+        if os.path.exists(extracted):
+            os.rename(extracted, _HUB_REPO_PATH)
+        logger.info("[Colorizer] Repo extracted.")
 
-    proto  = os.path.join(MODELS_DIR, "colorization_deploy_v2.prototxt")
-    model  = os.path.join(MODELS_DIR, "colorization_release_v2.caffemodel")
-    hull   = os.path.join(MODELS_DIR, "pts_in_hull.npy")
 
-    _download(_COLORIZE_PROTO_URL, proto)
-    _download(_COLORIZE_MODEL_URL, model)
-    _download(_COLORIZE_HULL_URL,  hull)
+def _load_colorizer():
+    global _colorizer
+    if _colorizer is not None:
+        return _colorizer
 
-    net = cv2.dnn.readNetFromCaffe(proto, model)
+    _ensure_colorizer_downloaded()
 
-    # Insert quantized ab-palette into the network layers
-    pts = np.load(hull).transpose().reshape(2, 313, 1, 1).astype(np.float32)
-    class8_id = net.getLayerId("class8_ab")
-    conv8_id  = net.getLayerId("conv8_313_rh")
-    net.getLayer(class8_id).blobs = [pts]
-    net.getLayer(conv8_id).blobs  = [np.full([1, 313], 2.606, dtype="float32")]
+    import sys
+    if _HUB_REPO_PATH not in sys.path:
+        sys.path.insert(0, _HUB_REPO_PATH)
 
-    _colorize_net = net
-    return _colorize_net
+    from colorizers import siggraph17  # noqa: import from hub repo
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"[Colorizer] Loading siggraph17 on device: {device}")
+
+    model = siggraph17(pretrained=True).to(device).eval()
+
+    _colorizer = model
+    logger.info("[Colorizer] Model ready.")
+    return _colorizer
 
 
 def colorize_image(image_bytes: bytes) -> bytes:
     """
-    Colorize a grayscale (or desaturated) image using the Zhang 2016 model.
-
-    Pipeline:
-        BGR → LAB → extract L → resize to 224×224 → net forward → ab output
-        → combine with original L → LAB → BGR → PNG bytes
+    Colorize a grayscale image using the Zhang 2017 SIGGRAPH colorizer.
+    Uses colorizers library's preprocess_img / postprocess_tens pipeline.
     """
-    net   = _load_colorize_net()
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Could not decode image.")
+    import sys
 
-    h, w  = img.shape[:2]
-    img_f = img.astype("float32") / 255.0
-    lab   = cv2.cvtColor(img_f, cv2.COLOR_BGR2LAB)
-    L     = cv2.split(lab)[0]                      # luminance
-    L_in  = cv2.resize(L, (224, 224)) - 50          # centre and resize
+    if _HUB_REPO_PATH not in sys.path:
+        sys.path.insert(0, _HUB_REPO_PATH)
 
-    net.setInput(cv2.dnn.blobFromImage(L_in))
-    ab_dec = net.forward()[0, :, :, :].transpose(1, 2, 0)
-    ab_dec = cv2.resize(ab_dec, (w, h))
+    from colorizers import preprocess_img, postprocess_tens
 
-    colorized = np.concatenate([L[:, :, np.newaxis], ab_dec], axis=2)
-    colorized = np.clip(cv2.cvtColor(colorized, cv2.COLOR_LAB2BGR), 0, 1)
-    colorized = (colorized * 255).astype(np.uint8)
+    colorizer = _load_colorizer()
+    device    = next(colorizer.parameters()).device
 
-    _, buf = cv2.imencode(".png", colorized)
+    pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img_rgb = np.array(pil_img)
+
+    (tens_l_orig, tens_l_rs) = preprocess_img(img_rgb, HW=(256, 256))
+    tens_l_rs = tens_l_rs.to(device)
+
+    with torch.no_grad():
+        ab_out = colorizer(tens_l_rs).cpu()
+
+    img_colorized = postprocess_tens(tens_l_orig, ab_out)  # float [0,1] RGB
+
+    img_uint8 = (np.clip(img_colorized, 0, 1) * 255).astype(np.uint8)
+    img_bgr   = cv2.cvtColor(img_uint8, cv2.COLOR_RGB2BGR)
+    _, buf = cv2.imencode(".png", img_bgr)
     return buf.tobytes()
 
 

@@ -3,11 +3,14 @@ import { motion } from "framer-motion";
 import { Sparkles, ArrowRight, ShieldCheck, Zap } from "lucide-react";
 
 export default function Hero() {
+  const scrollToEditor = () => {
+    document.getElementById("editor-section")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <section className="relative pt-32 pb-20 overflow-hidden">
-      {/* Background Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-purple-600/10 blur-[120px] rounded-full -z-10" />
-      
+
       <div className="max-w-7xl mx-auto px-6 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -35,8 +38,8 @@ export default function Hero() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-lg text-gray-400 max-w-2xl mx-auto mb-10"
         >
-          Siyah beyaz fotoğrafları renklendirin, bulanık kareleri netleştirin ve 
-          profesyonel editör araçlarıyla görselinizi mükemmelleştirin. Saniyeler içinde, tamamen tarayıcı üzerinden.
+          Siyah beyaz fotoğrafları renklendirin, bulanık kareleri netleştirin ve
+          profesyonel editör araçlarıyla görselinizi mükemmelleştirin.
         </motion.p>
 
         <motion.div
@@ -45,16 +48,21 @@ export default function Hero() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="flex flex-wrap justify-center gap-4"
         >
-          <button className="px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 group">
+          <button
+            onClick={scrollToEditor}
+            className="px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 group"
+          >
             Hemen Başla
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
-          <button className="px-8 py-4 glass text-white font-semibold rounded-xl hover:bg-white/10 transition-all">
+          <a
+            href="#how-it-works"
+            className="px-8 py-4 glass text-white font-semibold rounded-xl hover:bg-white/10 transition-all"
+          >
             Nasıl Çalışır?
-          </button>
+          </a>
         </motion.div>
 
-        {/* Features list */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

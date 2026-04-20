@@ -8,6 +8,12 @@ services:
     shm_size: '1gb'
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true        # needed for hot reload inside Docker/WSL2
+    volumes:
+      - ./frontend:/app               # live code sync
+      - /app/node_modules             # keep container's node_modules isolated
+      - /app/.next                    # keep build cache inside container
+    command: npm run dev
     depends_on:
       - backend
 
