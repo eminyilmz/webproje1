@@ -3,10 +3,10 @@ uvicorn[standard]
 python-multipart
 opencv-python-headless
 Pillow
-torch
-torchvision
 celery[redis]
 redis
 pydantic
 pydantic-settings
 python-dotenv
+# NOTE: torch + torchvision come from the pytorch/pytorch base Docker image
+# NOTE: basicsr, facexlib, gfpgan, realesrgan are installed in Dockerfile Step 1

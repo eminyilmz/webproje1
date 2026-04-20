@@ -1,33 +1,84 @@
+"""
+Celery Worker — Lumina AI
+==========================
+Routes image processing tasks to the appropriate service:
+  - grayscale / blur / adjust  →  ImageProcessor (OpenCV, synchronous, fast)
+  - colorize                   →  colorize_image  (Zhang 2016, DNN)
+  - sharpen                    →  sharpen_image   (Real-ESRGAN or fallback)
+"""
+
 import os
+import logging
 from celery import Celery
-import time
+
 from utils.image_processing import ImageProcessor
+from utils.ai_models import colorize_image, sharpen_image
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 celery_app = Celery("worker", broker=redis_url, backend=redis_url)
 
-@celery_app.task(name="process_image_task")
-def process_image_task(image_bytes, action, params=None):
+# Celery config — store results as bytes safely
+celery_app.conf.update(
+    result_serializer="pickle",
+    accept_content=["pickle", "json"],
+    task_serializer="pickle",
+)
+
+
+@celery_app.task(name="process_image_task", bind=True, max_retries=2)
+def process_image_task(self, image_bytes: bytes, action: str, params: dict = None):
+    """
+    Main task dispatcher.
+
+    Args:
+        image_bytes : raw image bytes (PNG/JPEG/etc.)
+        action      : one of grayscale | blur | adjust | colorize | sharpen
+        params      : optional dict with action-specific parameters
+
+    Returns:
+        Processed image as PNG bytes.
+    """
+    params = params or {}
     processor = ImageProcessor()
-    
-    if action == "grayscale":
-        return processor.to_grayscale(image_bytes)
-    elif action == "blur":
-        level = params.get("level", 5) if params else 5
-        return processor.apply_blur(image_bytes, level)
-    elif action == "adjust":
-        brightness = params.get("brightness", 1.0) if params else 1.0
-        contrast = params.get("contrast", 1.0) if params else 1.0
-        saturation = params.get("saturation", 1.0) if params else 1.0
-        return processor.adjust_image(image_bytes, brightness, contrast, saturation)
-    
-    # AI Tasks (Placeholders for now)
-    elif action == "colorize":
-        # Simulate AI processing time
-        time.sleep(2)
-        return image_bytes # Placeholder
-    elif action == "sharpen":
-        time.sleep(2)
-        return image_bytes # Placeholder
-        
-    return image_bytes
+
+    try:
+        # ── Classic operations (fast, no GPU needed) ──────────────────────────
+        if action == "grayscale":
+            return processor.to_grayscale(image_bytes)
+
+        elif action == "blur":
+            level = int(params.get("level", 5))
+            return processor.apply_blur(image_bytes, level)
+
+        elif action == "adjust":
+            return processor.adjust_image(
+                image_bytes,
+                brightness = float(params.get("brightness", 1.0)),
+                contrast   = float(params.get("contrast",   1.0)),
+                saturation = float(params.get("saturation", 1.0)),
+            )
+
+        # ── AI operations (may use GPU, first call downloads weights) ─────────
+        elif action == "colorize":
+            logger.info("[Worker] Starting colorization task …")
+            result = colorize_image(image_bytes)
+            logger.info("[Worker] Colorization complete.")
+            return result
+
+        elif action == "sharpen":
+            outscale = float(params.get("outscale", 1.0))
+            logger.info(f"[Worker] Starting sharpening task (outscale={outscale}) …")
+            result = sharpen_image(image_bytes, outscale=outscale)
+            logger.info("[Worker] Sharpening complete.")
+            return result
+
+        else:
+            logger.warning(f"[Worker] Unknown action '{action}', returning original.")
+            return image_bytes
+
+    except Exception as exc:
+        logger.error(f"[Worker] Task failed for action='{action}': {exc}")
+        raise self.retry(exc=exc, countdown=5)

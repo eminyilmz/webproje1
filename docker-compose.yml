@@ -21,6 +21,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend:/app
+      - model_weights:/app/models   # persist downloaded weights
     depends_on:
       - redis
 
@@ -36,6 +37,12 @@ services:
     command: celery -A worker worker --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - model_weights:/app/models   # share weights with backend
     depends_on:
       - redis
       - backend
+
+volumes:
+  model_weights:
