@@ -1,5 +1,5 @@
 """
-Celery Worker — Lumina AI
+Celery Worker — Piksel
 ==========================
 Routes image processing tasks to the appropriate service:
   - grayscale / blur / adjust  →  ImageProcessor (OpenCV, synchronous, fast)

@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Layers } from "lucide-react";
 
 export default function Hero() {
   const scrollToEditor = () => {
@@ -8,79 +8,115 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative pt-32 pb-20 overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-purple-600/10 blur-[120px] rounded-full -z-10" />
+    <section id="home" className="relative pt-44 pb-32 overflow-hidden bg-[#060608]">
+      {/* Floating Cinematic Moody Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute top-[20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-stone-900/30 blur-[150px] animate-float-cinematic-1" />
+        <div className="absolute bottom-[10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-zinc-950/50 blur-[180px] animate-float-cinematic-2" />
+        <div className="absolute top-[40%] right-[30%] w-[350px] h-[350px] rounded-full bg-neutral-900/25 blur-[120px] animate-float-cinematic-1" />
+      </div>
 
-      <div className="max-w-7xl mx-auto px-6 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8"
-        >
-          <Sparkles className="w-4 h-4 text-purple-400" />
-          <span className="text-sm font-medium text-purple-200">AI Destekli Yeni Nesil Editör</span>
-        </motion.div>
+      <div className="max-w-7xl mx-auto px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+          
+          {/* Main Title Left Side (Editorial asymmetric layout) */}
+          <div className="lg:col-span-8 space-y-12">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-3 text-stone-500 tracking-[0.4em] uppercase text-[9px] font-medium"
+            >
+              <Layers className="w-3 h-3 text-stone-500" />
+              <span>GAN Görüntü Restorasyonu</span>
+            </motion.div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-5xl md:text-7xl font-bold mb-6 tracking-tight"
-        >
-          Fotoğraflarınıza <br />
-          <span className="text-gradient">Yapay Zeka Dokunuşu</span>
-        </motion.h1>
+            <div className="relative">
+              {/* Volumetric background glow behind headers */}
+              <div className="absolute -top-12 -left-10 w-96 h-44 bg-white/[0.02] rounded-full blur-[100px] pointer-events-none -z-10" />
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-lg text-gray-400 max-w-2xl mx-auto mb-10"
-        >
-          Siyah beyaz fotoğrafları renklendirin, bulanık kareleri netleştirin ve
-          profesyonel editör araçlarıyla görselinizi mükemmelleştirin.
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex flex-wrap justify-center gap-4"
-        >
-          <button
-            onClick={scrollToEditor}
-            className="px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 group"
-          >
-            Hemen Başla
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-          <a
-            href="#how-it-works"
-            className="px-8 py-4 glass text-white font-semibold rounded-xl hover:bg-white/10 transition-all"
-          >
-            Nasıl Çalışır?
-          </a>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.5 }}
-          className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-left"
-        >
-          {[
-            { icon: <Zap className="w-6 h-6 text-yellow-400" />, title: "Hızlı İşlem", desc: "AI modellerimiz saniyeler içinde sonuç üretir." },
-            { icon: <ShieldCheck className="w-6 h-6 text-green-400" />, title: "Güvenli Saklama", desc: "Görselleriniz işlendikten sonra otomatik olarak silinir." },
-            { icon: <Sparkles className="w-6 h-6 text-purple-400" />, title: "Yüksek Kalite", desc: "Real-ESRGAN ile kristal netliğinde çıktılar." },
-          ].map((feature, i) => (
-            <div key={i} className="p-6 glass-card">
-              <div className="mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
+              {/* Overlapping text size */}
+              <motion.h1
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1.2, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                className="text-7xl md:text-9xl font-editorial font-light tracking-tight leading-[0.85] text-stone-100 relative z-10 flex items-baseline"
+              >
+                Piksel
+                <motion.span 
+                  animate={{ opacity: [0.3, 0.85, 0.3], scale: [0.95, 1.05, 0.95] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="inline-block w-2.5 h-2.5 bg-white rounded-full ml-4 shadow-[0_0_8px_#fff,0_0_15px_#fff]"
+                />
+              </motion.h1>
+              
+              <motion.h2
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 1.4, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                className="text-5xl md:text-7xl font-editorial italic text-stone-500 font-extralight tracking-tight ml-16 md:ml-32 mt-2"
+              >
+                Restorasyonu
+              </motion.h2>
             </div>
-          ))}
-        </motion.div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.2, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="text-stone-400 font-light text-base md:text-lg leading-relaxed max-w-xl font-sans"
+            >
+              Siyah beyaz fotoğrafları renklendirin, bulanık kareleri netleştirin ve
+              gelişmiş restorasyon modellerimizle görselinizi mükemmelleştirin.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.2, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-wrap items-center gap-6 pt-4"
+            >
+              <button
+                onClick={scrollToEditor}
+                className="px-8 py-4 bg-stone-100 hover:bg-white text-stone-950 font-medium text-[10px] tracking-[0.2em] uppercase transition-all duration-300 flex items-center gap-3 rounded-none shadow-2xl cursor-pointer"
+              >
+                Hemen Başla
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <a
+                href="#about"
+                className="px-8 py-4 bg-transparent border border-white/10 hover:border-white/20 text-stone-300 hover:text-white font-medium text-[10px] tracking-[0.2em] uppercase transition-all duration-300 rounded-none"
+              >
+                Keşfet
+              </a>
+            </motion.div>
+          </div>
+
+          {/* Side Info Box Right Side (Breaking the standard grid) */}
+          <div className="lg:col-span-4 lg:mt-24 space-y-8">
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 1.4, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="border-l border-white/5 relative pl-8 space-y-12"
+            >
+              {/* Glowing vertical line accent */}
+              <div className="absolute left-0 top-0 w-[1px] h-20 bg-gradient-to-b from-white/40 to-transparent" />
+              {[
+                { label: "01 / HIZ", title: "Hızlı İşlem", desc: "Restorasyon modellerimiz saniyeler içinde sonuç üretir." },
+                { label: "02 / GÜVENLİK", title: "Güvenli Saklama", desc: "Görselleriniz işlendikten sonra otomatik olarak silinir." },
+                { label: "03 / NETLİK", title: "Yüksek Çözünürlük", desc: "Super-Resolution modelleriyle kristal netliğinde çıktılar." },
+              ].map((item, idx) => (
+                <div key={idx} className="space-y-2 group">
+                  <div className="text-[9px] font-sans tracking-[0.3em] text-stone-500 uppercase">{item.label}</div>
+                  <h3 className="font-editorial text-xl font-light text-stone-200 group-hover:text-white transition-colors">{item.title}</h3>
+                  <p className="text-stone-400 font-light text-xs leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
+        </div>
       </div>
     </section>
   );

@@ -1,5 +1,5 @@
 """
-FastAPI main — Lumina AI
+FastAPI main — Piksel
 ========================
 Endpoints:
   GET  /            → health
@@ -24,12 +24,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── allowed MIME types ────────────────────────────────────────────────────────
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff"}
+ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/bmp", "image/tiff"}
 MAX_FILE_SIZE  = 20 * 1024 * 1024  # 20 MB
 
 # ── app ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="Lumina AI API",
+    title="Piksel API",
     description="AI-powered image processing backend",
     version="1.0.0",
 )
@@ -46,7 +46,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Lumina AI API is running", "docs": "/docs"}
+    return {"message": "Piksel API is running", "docs": "/docs"}
 
 
 @app.get("/health")
@@ -70,10 +70,12 @@ async def upload_image(
     contrast:   float = Query(default=1.0, description="Contrast multiplier (0.5–2.0)"),
     saturation: float = Query(default=1.0, description="Saturation multiplier (0.0–2.0)"),
 ):
-    if file.content_type not in ALLOWED_TYPES:
+    # ── Validate file type (flexible) ──────────────────────────────────────────
+    is_image = file.content_type and file.content_type.startswith("image/")
+    if not is_image and file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported file type '{file.content_type}'. Allowed: {', '.join(ALLOWED_TYPES)}",
+            detail=f"Unsupported file type '{file.content_type}'. Must be an image.",
         )
 
     contents = await file.read()

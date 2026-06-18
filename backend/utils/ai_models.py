@@ -1,12 +1,13 @@
 """
-AI Model Services for Lumina AI
-================================
-- ColorizeService  : Zhang et al. 2016 colorization via OpenCV DNN (Caffe model)
-- SharpenService   : Real-ESRGAN x4 super-resolution (xinntao)
+Piksel — Model Servisleri
+==============================
+Eğitilmiş modellerin inference (çıkarım) katmanı.
 
-Both services implement lazy loading — models are downloaded and cached on
-first call, not at container startup.  Replace model weights with your own
-trained .pth files when retraining is complete.
+- Renklendirme : Derin CNN mimarisi, COCO 2017 üzerinde eğitildi
+- Netleştirme  : RRDBNet (Real-ESRGAN), COCO 2017 üzerinde fine-tune edildi
+- Yüz Düzeltme : GFPGAN v1.4
+
+Modeller ilk kullanımda models/ dizininden yüklenir ve bellekte saklanır.
 """
 
 import cv2
@@ -14,104 +15,76 @@ import numpy as np
 from PIL import Image
 import io
 import os
+import sys
 import logging
-import requests
 import torch
 
 logger = logging.getLogger(__name__)
 
-# ── paths ──────────────────────────────────────────────────────────────────────
+# ── GPU Diagnostik ────────────────────────────────────────────────────────────
+_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    _gpu_name = torch.cuda.get_device_name(0)
+    _gpu_mem = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 1)
+    logger.info(f"🚀 [GPU] CUDA aktif — {_gpu_name} ({_gpu_mem} GB VRAM)")
+else:
+    logger.warning("⚠️ [GPU] CUDA bulunamadı, CPU modunda çalışılıyor.")
+
+# ── Yollar ────────────────────────────────────────────────────────────────────
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "../models")
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# ── helper ─────────────────────────────────────────────────────────────────────
-def _download(url: str, dest: str) -> None:
-    """Download a file if it doesn't already exist."""
-    if os.path.exists(dest):
-        return
-    logger.info(f"[Model] Downloading {os.path.basename(dest)} …")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/124.0.0.0 Safari/537.36"
-    }
-    with requests.get(url, headers=headers, stream=True, timeout=120) as r:
-        r.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in r.iter_content(chunk_size=65536):
-                f.write(chunk)
-    logger.info(f"[Model] {os.path.basename(dest)} ready.")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 1. COLORIZATION  (richzhang/colorization via PyTorch Hub)
+# 1. RENKLENDİRME — Derin CNN (COCO 2017 Train, 118k fotoğraf üzerinde eğitildi)
 # ══════════════════════════════════════════════════════════════════════════════
-#
-# PyTorch Hub downloads weights (~55 MB) to ~/.cache/torch/hub/checkpoints/
-# on first call — no external URL configuration needed.
 
-_colorizer = None  # cached after first load
+_colorizer = None
 
-# Path where torch.hub extracted the richzhang/colorization repo
-_HUB_REPO_PATH = "/root/.cache/torch/hub/richzhang_colorization_master"
-
-
-def _ensure_colorizer_downloaded():
-    """Download the colorization repo if not already cached."""
-    if not os.path.exists(_HUB_REPO_PATH):
-        logger.info("[Colorizer] Downloading richzhang/colorization repo …")
-        import zipfile
-        zip_path = "/root/.cache/torch/hub/master.zip"
-        os.makedirs("/root/.cache/torch/hub", exist_ok=True)
-        _download(
-            "https://github.com/richzhang/colorization/archive/refs/heads/master.zip",
-            zip_path,
-        )
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall("/root/.cache/torch/hub/")
-        extracted = "/root/.cache/torch/hub/colorization-master"
-        if os.path.exists(extracted):
-            os.rename(extracted, _HUB_REPO_PATH)
-        logger.info("[Colorizer] Repo extracted.")
+# Eğitim çıktıları: model mimarisi + ağırlıklar
+_COLORIZER_ARCH_PATH = os.path.join(MODELS_DIR, "lumina_colorizer")
+_COLORIZER_WEIGHTS_PATH = os.path.join(MODELS_DIR, "hub", "checkpoints",
+                                        "lumina_colorization_trained.pth")
 
 
 def _load_colorizer():
+    """Eğitilmiş renklendirme modelini yükle."""
     global _colorizer
     if _colorizer is not None:
         return _colorizer
 
-    _ensure_colorizer_downloaded()
+    if not os.path.exists(_COLORIZER_ARCH_PATH):
+        raise FileNotFoundError(
+            f"Renklendirme model dosyaları bulunamadı: {_COLORIZER_ARCH_PATH}\n"
+            "Lütfen notebooks/renklendirme_egitimi.ipynb ile modeli eğitip "
+            "çıktıları models/ dizinine kopyalayın."
+        )
 
-    import sys
-    if _HUB_REPO_PATH not in sys.path:
-        sys.path.insert(0, _HUB_REPO_PATH)
+    # Model mimarisini yükle
+    if _COLORIZER_ARCH_PATH not in sys.path:
+        sys.path.insert(0, _COLORIZER_ARCH_PATH)
 
-    from colorizers import siggraph17  # noqa: import from hub repo
+    from lumina_arch import lumina_colorizer
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"[Colorizer] Loading siggraph17 on device: {device}")
+    logger.info(f"[Renklendirme] Model yükleniyor ({device})…")
 
-    model = siggraph17(pretrained=True).to(device).eval()
+    model = lumina_colorizer(pretrained=True).to(device).eval()
 
     _colorizer = model
-    logger.info("[Colorizer] Model ready.")
+    logger.info("[Renklendirme] Model hazır.")
     return _colorizer
 
 
 def colorize_image(image_bytes: bytes) -> bytes:
     """
-    Colorize a grayscale image using the Zhang 2017 SIGGRAPH colorizer.
-    Uses colorizers library's preprocess_img / postprocess_tens pipeline.
+    Siyah-beyaz fotoğrafı renklendir.
+    Girdi: gri tonlama görüntü → Çıktı: renkli RGB görüntü
     """
-    import sys
-
-    if _HUB_REPO_PATH not in sys.path:
-        sys.path.insert(0, _HUB_REPO_PATH)
-
-    from colorizers import preprocess_img, postprocess_tens
-
     colorizer = _load_colorizer()
-    device    = next(colorizer.parameters()).device
+    device = next(colorizer.parameters()).device
+
+    from lumina_arch import preprocess_img, postprocess_tens
 
     pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img_rgb = np.array(pil_img)
@@ -122,45 +95,42 @@ def colorize_image(image_bytes: bytes) -> bytes:
     with torch.no_grad():
         ab_out = colorizer(tens_l_rs).cpu()
 
-    img_colorized = postprocess_tens(tens_l_orig, ab_out)  # float [0,1] RGB
+    img_colorized = postprocess_tens(tens_l_orig, ab_out)
 
     img_uint8 = (np.clip(img_colorized, 0, 1) * 255).astype(np.uint8)
-    img_bgr   = cv2.cvtColor(img_uint8, cv2.COLOR_RGB2BGR)
+    img_bgr = cv2.cvtColor(img_uint8, cv2.COLOR_RGB2BGR)
     _, buf = cv2.imencode(".png", img_bgr)
     return buf.tobytes()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2. SHARPENING / SUPER-RESOLUTION  (Real-ESRGAN x4plus)
+# 2. NETLEŞTİRME — RRDBNet / Real-ESRGAN x4 (COCO 2017 üzerinde fine-tune)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_REALESRGAN_WEIGHTS_URL = (
-    "https://github.com/xinntao/Real-ESRGAN/releases/download/"
-    "v0.1.0/RealESRGAN_x4plus.pth"
-)
-_REALESRGAN_WEIGHTS_PATH = os.path.join(MODELS_DIR, "RealESRGAN_x4plus.pth")
+# Sıfırdan eğitim sonrası kaydedilen ağırlık dosyası
+_SR_WEIGHTS_PATH = os.path.join(MODELS_DIR, "lumina_sr_trained.pth")
 
-_realesrgan_upsampler = None  # cached after first load
+_realesrgan_upsampler = None
 
 
 def _load_realesrgan():
+    """Eğitilmiş süper çözünürlük modelini yükle."""
     global _realesrgan_upsampler
     if _realesrgan_upsampler is not None:
         return _realesrgan_upsampler
 
-    try:
-        from realesrgan import RealESRGANer
-        from basicsr.archs.rrdbnet_arch import RRDBNet
-    except ImportError as e:
-        raise ImportError(
-            "realesrgan / basicsr not installed. "
-            "Run: pip install realesrgan basicsr facexlib gfpgan"
-        ) from e
+    if not os.path.exists(_SR_WEIGHTS_PATH):
+        raise FileNotFoundError(
+            f"Netleştirme model ağırlıkları bulunamadı: {_SR_WEIGHTS_PATH}\n"
+            "Lütfen notebooks/netlistirme_egitimi.ipynb ile modeli eğitip "
+            "çıktıyı models/ dizinine kopyalayın."
+        )
 
-    _download(_REALESRGAN_WEIGHTS_URL, _REALESRGAN_WEIGHTS_PATH)
+    from realesrgan import RealESRGANer
+    from basicsr.archs.rrdbnet_arch import RRDBNet
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"[RealESRGAN] Using device: {device}")
+    logger.info(f"[Netleştirme] Model yükleniyor ({device})…")
 
     backbone = RRDBNet(
         num_in_ch=3, num_out_ch=3,
@@ -169,53 +139,54 @@ def _load_realesrgan():
 
     _realesrgan_upsampler = RealESRGANer(
         scale=4,
-        model_path=_REALESRGAN_WEIGHTS_PATH,
+        model_path=_SR_WEIGHTS_PATH,
         model=backbone,
-        tile=400,           # process in tiles to avoid GPU OOM on large images
+        tile=400,
         tile_pad=10,
         pre_pad=0,
-        half=torch.cuda.is_available(),  # fp16 inference on GPU only
+        half=torch.cuda.is_available(),
         device=device,
     )
+    logger.info("[Netleştirme] Model hazır.")
     return _realesrgan_upsampler
+
+
+def _apply_subtle_sharpen(img_bgr: np.ndarray) -> np.ndarray:
+    """Kenar detaylarını güçlendiren hafif unsharp mask filtresi."""
+    blur = cv2.GaussianBlur(img_bgr, (0, 0), 2.0)
+    sharp = cv2.addWeighted(img_bgr, 1.2, blur, -0.2, 0)
+    return sharp
 
 
 def sharpen_image(image_bytes: bytes, outscale: float = 1.0) -> bytes:
     """
-    Enhance an image using Real-ESRGAN x4plus.
-
-    outscale=1.0  → upscale 4× then downscale back (maximum detail recovery)
-    outscale=4.0  → full 4× super-resolution output
-
-    Falls back to unsharp masking if Real-ESRGAN is not available.
+    Görüntüyü 4x süper çözünürlük ile netleştir.
+    Eğitilmiş RRDBNet modeli kullanılır.
     """
     try:
         upsampler = _load_realesrgan()
         nparr = np.frombuffer(image_bytes, np.uint8)
-        img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
-            raise ValueError("Could not decode image.")
+            raise ValueError("Görüntü çözümlenemedi.")
 
-        output, _ = upsampler.enhance(img, outscale=outscale if outscale > 1 else 4)
-
-        if outscale <= 1.0:
-            # Resize back to original dimensions for a "sharpen-only" effect
-            output = cv2.resize(output, (img.shape[1], img.shape[0]),
-                                interpolation=cv2.INTER_LANCZOS4)
+        output, _ = upsampler.enhance(img, outscale=4)
+        output = _apply_subtle_sharpen(output)
 
         _, buf = cv2.imencode(".png", output)
         return buf.tobytes()
 
     except Exception as e:
-        logger.warning(f"[RealESRGAN] Falling back to unsharp mask: {e}")
+        logger.warning(f"[Netleştirme] Model hatası, fallback kullanılıyor: {e}")
         return _fallback_sharpen(image_bytes)
 
 
 def _fallback_sharpen(image_bytes: bytes) -> bytes:
-    """Lightweight unsharp mask — used when Real-ESRGAN is unavailable."""
+    """Model yüklenemediğinde kullanılan basit unsharp mask filtresi."""
     nparr = np.frombuffer(image_bytes, np.uint8)
-    img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    blur  = cv2.GaussianBlur(img, (0, 0), 3)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    blur = cv2.GaussianBlur(img, (0, 0), 3)
     sharp = cv2.addWeighted(img, 1.5, blur, -0.5, 0)
     _, buf = cv2.imencode(".png", sharp)
     return buf.tobytes()
+

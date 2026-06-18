@@ -8,5 +8,7 @@ redis
 pydantic
 pydantic-settings
 python-dotenv
+scikit-image
+basicsr
+realesrgan
 # NOTE: torch + torchvision come from the pytorch/pytorch base Docker image
-# NOTE: basicsr, facexlib, gfpgan, realesrgan are installed in Dockerfile Step 1

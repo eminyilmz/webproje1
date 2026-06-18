@@ -1,8 +1,8 @@
-# Lumina AI 🎨
+# Piksel 🎨
 
-Lumina AI is a powerful, production-ready AI photo editing platform built with a modern stack. It features a sleek glassmorphism UI, a robust Python backend for image processing, and a scalable worker-based architecture for handling heavy AI tasks.
+Piksel is a powerful, production-ready AI photo editing platform built with a modern stack. It features a sleek glassmorphism UI, a robust Python backend for image processing, and a scalable worker-based architecture for handling heavy AI tasks.
 
-![Lumina AI Banner](https://via.placeholder.com/1200x400?text=Lumina+AI+Photo+Editor)
+![Piksel Banner](https://via.placeholder.com/1200x400?text=Piksel+Photo+Editor)
 
 ## 🚀 Features
 
@@ -32,8 +32,8 @@ Lumina AI is a powerful, production-ready AI photo editing platform built with a
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/lumina-ai.git
-   cd lumina-ai
+   git clone https://github.com/yourusername/piksel.git
+   cd piksel
    ```
 
 2. **Set up environment variables:**
@@ -53,7 +53,7 @@ Lumina AI is a powerful, production-ready AI photo editing platform built with a
 ## 📁 Project Structure
 
 ```text
-lumina-ai/
+piksel/
 ├── frontend/        # Next.js Application
 ├── backend/         # FastAPI & AI Logic
 │   ├── utils/       # Image processing utilities

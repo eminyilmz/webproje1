@@ -25,11 +25,19 @@ services:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ./backend:/app
-      - model_weights:/app/models   # persist downloaded weights
     depends_on:
       - redis
+    # GPU olmayan (CPU-only) bilgisayarlarda çalıştırmak için aşağıdaki 'deploy' bloğunu tamamen yorum satırı yapın:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   redis:
     image: redis:alpine
@@ -40,15 +48,22 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A worker worker --loglevel=info
+    command: celery -A worker worker --loglevel=info --pool=solo --concurrency=1
+    shm_size: '2gb'
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - ./backend:/app
-      - model_weights:/app/models   # share weights with backend
     depends_on:
       - redis
       - backend
+    # GPU olmayan (CPU-only) bilgisayarlarda çalıştırmak için aşağıdaki 'deploy' bloğunu tamamen yorum satırı yapın:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
-volumes:
-  model_weights:
