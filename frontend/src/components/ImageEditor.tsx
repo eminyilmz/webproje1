@@ -516,67 +516,67 @@ export default function ImageEditor() {
               </div>
 
               {/* Before / After Slider */}
-              <div 
-                ref={sliderRef}
-                onMouseDown={() => setIsDragging(true)}
-                onMouseMove={handleMouseMove}
-                onTouchMove={handleTouchMove}
-                onClick={(e) => handleSliderMove(e.clientX)}
-                className="rounded-none overflow-hidden bg-zinc-950 relative border border-white/5 h-[500px] select-none cursor-ew-resize"
-              >
-                {/* Processing Overlay */}
-                <AnimatePresence>
-                  {isProcessing && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 bg-[#060608]/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6"
-                    >
-                      <div className="relative w-48 h-1 bg-stone-800 overflow-hidden mb-4">
-                        <motion.div
-                          className="absolute h-full bg-stone-100"
-                          initial={{ left: "-100%" }}
-                          animate={{ left: "100%" }}
-                          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                          style={{ width: "50%" }}
-                        />
-                      </div>
-                      <p className="text-[10px] tracking-widest uppercase text-stone-400 font-mono">{statusMsg}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              <div className="rounded-none bg-zinc-950 border border-white/5 h-[500px] flex items-center justify-center p-4">
+                <div 
+                  ref={sliderRef}
+                  onMouseDown={() => setIsDragging(true)}
+                  onMouseMove={handleMouseMove}
+                  onTouchMove={handleTouchMove}
+                  onClick={(e) => handleSliderMove(e.clientX)}
+                  className="relative max-w-full max-h-full flex-shrink-0 cursor-ew-resize select-none overflow-hidden"
+                >
+                  {/* Processing Overlay */}
+                  <AnimatePresence>
+                    {isProcessing && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-[#060608]/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6"
+                      >
+                        <div className="relative w-48 h-1 bg-stone-800 overflow-hidden mb-4">
+                          <motion.div
+                            className="absolute h-full bg-stone-100"
+                            initial={{ left: "-100%" }}
+                            animate={{ left: "100%" }}
+                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            style={{ width: "50%" }}
+                          />
+                        </div>
+                        <p className="text-[10px] tracking-widest uppercase text-stone-400 font-mono">{statusMsg}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                {/* Original Image (Background — always the uploaded photo) */}
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center p-4">
+                  {/* Original Image (Sets the container bounds) */}
                   <img
                     src={originalImage!}
                     alt="Orijinal"
-                    className="max-w-full max-h-full object-contain pointer-events-none"
+                    className="block max-w-full max-h-[468px] pointer-events-none"
                     style={{ transform: imageTransform }}
                   />
-                </div>
 
-                {/* Processed Image (Foreground, clipped by slider) */}
-                <div 
-                  className="absolute inset-0 w-full h-full flex items-center justify-center p-4 overflow-hidden"
-                  style={{ clipPath: `inset(0 0 0 ${sliderPosition}%)` }}
-                >
-                  <img
-                    src={processedImage ?? originalImage!}
-                    alt="İşlenmiş"
-                    className="max-w-full max-h-full object-contain pointer-events-none"
-                    style={{ transform: imageTransform }}
-                  />
-                </div>
+                  {/* Processed Image (Overlays perfectly over original image bounds) */}
+                  <div 
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ clipPath: `inset(0 0 0 ${sliderPosition}%)` }}
+                  >
+                    <img
+                      src={processedImage ?? originalImage!}
+                      alt="İşlenmiş"
+                      className="absolute top-0 left-0 w-full h-full object-fill pointer-events-none"
+                      style={{ transform: imageTransform }}
+                    />
+                  </div>
 
-                {/* Divider Line & Handle */}
-                <div 
-                  className="absolute top-0 bottom-0 w-[2px] bg-white/30 pointer-events-none"
-                  style={{ left: `${sliderPosition}%` }}
-                >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-zinc-900 border-2 border-white/40 flex items-center justify-center shadow-2xl text-stone-200 backdrop-blur-sm">
-                    <ArrowLeftRight className="w-4 h-4" />
+                  {/* Divider Line & Handle */}
+                  <div 
+                    className="absolute top-0 bottom-0 w-[2px] bg-white/30 pointer-events-none"
+                    style={{ left: `${sliderPosition}%` }}
+                  >
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-zinc-900 border-2 border-white/40 flex items-center justify-center shadow-2xl text-stone-200 backdrop-blur-sm">
+                      <ArrowLeftRight className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
               </div>

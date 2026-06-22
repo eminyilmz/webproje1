@@ -31,13 +31,13 @@ services:
     depends_on:
       - redis
     # GPU olmayan (CPU-only) bilgisayarlarda çalıştırmak için aşağıdaki 'deploy' bloğunu tamamen yorum satırı yapın:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
   redis:
     image: redis:alpine
@@ -59,11 +59,11 @@ services:
       - redis
       - backend
     # GPU olmayan (CPU-only) bilgisayarlarda çalıştırmak için aşağıdaki 'deploy' bloğunu tamamen yorum satırı yapın:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
 
